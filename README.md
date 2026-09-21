@@ -1,31 +1,51 @@
-## The gpio pinout command
+# README
 
-`gpio pinout` is a colour coded view of the board headers, in the spirit of the
-`pinout` command on a Raspberry Pi. It shows the same data as `gpio readall`,
-laid out like the physical header: odd pins on the left, even pins on the
-right. Each pin has its name, its SoC pin, and its current mode and value.
-Pins that are in use are bold, unclaimed pins show a dim "off". `gpio readall`
-is unchanged.
+## What's New
 
-![gpio pinout on an Orange Pi Zero](images/gpio-pinout-orangepi-zero.png)
+`gpio pinout` is a color coded view of the board headers, in the spirit of the
+`pinout` ([Github](https://github.com/pinout-xyz/Pinout.xyz)) command on a Raspberry Pi. 
 
+It shows the same data as `gpio readall`, laid out like the physical header. 
+Each pin has its name, its SoC pin, and its current mode and value. Pins that are in use are **bold**, unclaimed pins show a dim _off_. 
+
+`gpio readall` is unchanged.
+
+![gpio pinout on an Orange Pi Zero](assets/gpio-pinout-orangepi-zero.png)
+
+```bash
+gpio pinout                 the default view
+gpio pinout --wpi           add the wPi numbers
+gpio pinout --gpio          add the Linux GPIO numbers
+gpio pinout --monochrome    no colour
+gpio pinout --color         force colour, for example into "less -R"
 ```
-# gpio pinout                 the default view
-# gpio pinout --wpi           add the wPi numbers
-# gpio pinout --gpio          add the Linux GPIO numbers
-# gpio pinout --monochrome    no colour
-# gpio pinout --color         force colour, for example into "less -R"
-```
 
-Colour is only used on a terminal, and never when the `NO_COLOR` environment
-variable is set. A header that carries no GPIOs (the 13-pin header of the
+### Other Features:
+
+1. Color is only used on a terminal, and never when the `NO_COLOR` environment
+variable is set.
+2. A header that carries no GPIOs (the 13-pin header of the
 Orange Pi Zero: USB, audio, video, IR) is listed next to the main header, or
 below it when the terminal is too narrow.
 
-### Verified boards
+## How to install
 
-Only one so far: the **Orange Pi Zero** (Allwinner H2+, Armbian). It is the only
-board the author owns. There every pin was compared against `gpio readall`:
+> Temporary instructions based on fork and feature branch. To be updated after Review and Merge to main author's 'next' branch.  
+
+```bash 
+git clone -b feature/pinout-view https://github.com/dattasaurabh82/wiringOP.git
+cd wiringOP
+./build clean
+./build
+gpio pinout
+gpio pinout --demo
+```
+
+---
+
+>[!Important]
+> **Verified boards**: Only one so far: the **Orange Pi Zero** (Allwinner H2+, Armbian). It is the only
+board I own so far (Saurabh Datta). There every pin was compared against `gpio readall`:
 name, wPi number, GPIO number, mode and value.
 
 On any other board `gpio pinout` does not guess. It says that the board has not
@@ -33,29 +53,32 @@ been verified yet and points to `gpio readall` and to the demo below.
 
 ### Preview any board without hardware
 
-```
+```bash
 $ gpio pinout --demo              list the boards
 $ gpio pinout --demo pc-2         preview one of them
 $ gpio pinout --demo 5-plus --wpi
 ```
 
-The demo prints from wiringOP's own pin tables, the same ones `gpio readall`
-uses, for every board wiringOP knows. It needs no root rights and no Orange Pi,
-so it also runs on a PC. The pin names and wPi numbers are real. The pin state
-is a placeholder, and the SoC and GPIO columns are left out because they are
-only known on the real board.
+![gpio pinout --demo, a preview of a board without hardware](assets/gpio-pinout-demo.png)
+
+>[!Note]
+The demo prints from wiringOP's own pin tables, the same ones `gpio readall` uses, for every board wiringOP knows. 
+It needs no root rights and no Orange Pi, so it also runs on a PC. The pin names and wPi numbers are real.
+The pin state is a placeholder, and the SoC and GPIO columns are left out because they are only known on the real board.
 
 To try it on a machine without installing anything:
 
+```bash
+git clone https://github.com/orangepi-xunlong/wiringOP.git
+cd wiringOP
+(cd wiringPi && make && ln -sf libwiringPi.so.* libwiringPi.so)
+(cd devLib && make INCLUDE="-I. -I../wiringPi" && ln -sf libwiringPiDev.so.* libwiringPiDev.so)
+(cd gpio && make INCLUDE="-I../wiringPi -I../devLib" LDFLAGS="-L../wiringPi -L../devLib")
+cd gpio
+LD_LIBRARY_PATH=../wiringPi:../devLib ./gpio pinout --demo zero
 ```
-$ git clone https://github.com/orangepi-xunlong/wiringOP.git
-$ cd wiringOP
-$ (cd wiringPi && make && ln -sf libwiringPi.so.* libwiringPi.so)
-$ (cd devLib && make INCLUDE="-I. -I../wiringPi" && ln -sf libwiringPiDev.so.* libwiringPiDev.so)
-$ (cd gpio && make INCLUDE="-I../wiringPi -I../devLib" LDFLAGS="-L../wiringPi -L../devLib")
-$ cd gpio
-$ LD_LIBRARY_PATH=../wiringPi:../devLib ./gpio pinout --demo zero
-```
+
+---
 
 ### How to verify and add your board
 
@@ -68,7 +91,7 @@ $ LD_LIBRARY_PATH=../wiringPi:../devLib ./gpio pinout --demo zero
    (`cat /proc/device-tree/model`). `pinoutSunxiPinName` fits the Allwinner
    boards (12 becomes PA12). Other SoC families need a small function of their
    own.
-3. Optional: the board facts and a secondary header, see `pinoutBoard_ZERO`.
+3. **Optional**: the board facts and a secondary header, see `pinoutBoard_ZERO`.
    They are only shown when the device tree model string matches, because one
    wiringOP model can cover several boards.
 4. Build, then compare `gpio pinout --wpi --gpio` with `gpio readall` row by
@@ -80,51 +103,34 @@ $ LD_LIBRARY_PATH=../wiringPi:../devLib ./gpio pinout --demo zero
 The rendering is in `gpio/pinout.c` and has no hardware access. It can be built
 and tried on its own with a few lines of test data.
 
----
-## How to download wiringOP
 
-```
-# apt-get update
-# apt-get install -y git
-# git clone https://github.com/orangepi-xunlong/wiringOP.git
-```
-
-## How to build wiringOP
-
-```
-# cd wiringOP
-# ./build clean
-# ./build 
-```
 
 ---
 ## The output of the gpio readall command
-
 ## Allwinner H2+
 
 ### Orange Pi Zero/R1
 
+> NEW
+
+```bash
+gpio pinout --gpio --wpi
 ```
- +------+-----+----------+------+---+  OPi H2  +---+------+----------+-----+------+
- | GPIO | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | GPIO |
- +------+-----+----------+------+---+----++----+---+------+----------+-----+------+
- |      |     |     3.3V |      |   |  1 || 2  |   |      | 5V       |     |      |
- |   12 |   0 |    SDA.0 | ALT2 | 0 |  3 || 4  |   |      | 5V       |     |      |
- |   11 |   1 |    SCL.0 | ALT2 | 0 |  5 || 6  |   |      | GND      |     |      |
- |    6 |   2 |    PWM.1 |  OFF | 0 |  7 || 8  | 0 | ALT2 | TXD.1    | 3   | 198  |
- |      |     |      GND |      |   |  9 || 10 | 0 | ALT2 | RXD.1    | 4   | 199  |
- |    1 |   5 |    RXD.2 | ALT2 | 0 | 11 || 12 | 0 | OFF  | PA07     | 6   | 7    |
- |    0 |   7 |    TXD.2 | ALT2 | 0 | 13 || 14 |   |      | GND      |     |      |
- |    3 |   8 |    CTS.2 |  OFF | 0 | 15 || 16 | 0 | ALT3 | SDA.1    | 9   | 19   |
- |      |     |     3.3V |      |   | 17 || 18 | 0 | ALT3 | SCK.1    | 10  | 18   |
- |   15 |  11 |   MOSI.1 | ALT2 | 1 | 19 || 20 |   |      | GND      |     |      |
- |   16 |  12 |   MISO.1 | ALT2 | 0 | 21 || 22 | 0 | OFF  | RTS.2    | 13  | 2    |
- |   14 |  14 |   SCLK.1 | ALT2 | 0 | 23 || 24 | 0 | ALT2 | CE.1     | 15  | 13   |
- |      |     |      GND |      |   | 25 || 26 | 0 | OFF  | PA10     | 16  | 10   |
- +------+-----+----------+------+---+----++----+---+------+----------+-----+------+
- | GPIO | wPi |   Name   | Mode | V | Physical | V | Mode | Name     | wPi | GPIO |
- +------+-----+----------+------+---+  OPi H2  +---+------+----------+-----+------+
+
+Output: 
+
+![gpio pinout --gpio --wpi on an Orange Pi Zero](assets/gpio-pinout-orangepi-zero.png)
+
+> Previous `readall` cmd
+
+```bash
+gpio readall
 ```
+
+Output: 
+
+![gpio readall on an Orange Pi Zero](assets/gpio-readall-orangepi-zero.png)
+
 
 ## Allwinner H3
 
