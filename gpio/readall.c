@@ -35,6 +35,8 @@
 
 #include <wiringPi.h>
 
+#include "pinout.h"
+
 extern int wpMode ;
 
 #ifndef TRUE
@@ -2698,6 +2700,174 @@ void doReadall (void)
 	piBoardId (&model) ;
 
 	OrangePiReadAll(model);
+}
+
+
+/*
+ * doPinout:
+ *	A colour coded view of the board headers, the rendering is in pinout.c.
+ *	This leaves readall alone: boards are added to the table below one
+ *	row at a time, once they have been checked on real hardware.
+ *
+ *	The board facts (and the secondary header) are only shown when the
+ *	device tree model string matches, because one wiringOP model can
+ *	cover more than one board (PI_MODEL_ZERO is the Zero and the R1).
+ *********************************************************************************
+ */
+
+// Orange Pi Zero, 13-pin header. Listed as it sits on the board when
+//	pin 1 of the 26-pin header is at the top: 13 first, 1 last.
+
+static const pinout_aux_pin pinoutAux_ZERO [13] =
+{
+	{ 13, "CIR-RX",   PINOUT_KIND_GPIO  },
+	{ 12, "MIC1N",    PINOUT_KIND_AUDIO },
+	{ 11, "MIC1P",    PINOUT_KIND_AUDIO },
+	{ 10, "MIC-BIAS", PINOUT_KIND_AUDIO },
+	{  9, "TV-OUT",   PINOUT_KIND_VIDEO },
+	{  8, "LINEOUTL", PINOUT_KIND_AUDIO },
+	{  7, "LINEOUTR", PINOUT_KIND_AUDIO },
+	{  6, "USB-DP3",  PINOUT_KIND_USB   },
+	{  5, "USB-DM3",  PINOUT_KIND_USB   },
+	{  4, "USB-DP2",  PINOUT_KIND_USB   },
+	{  3, "USB-DM2",  PINOUT_KIND_USB   },
+	{  2, "GND",      PINOUT_KIND_GND   },
+	{  1, "5V",       PINOUT_KIND_5V    },
+} ;
+
+static const pinout_board pinoutBoard_ZERO =
+{
+	"Orange Pi Zero", "Allwinner H2+ (sun8i)", "MicroSD",
+	"1", "(+2 on the 13-pin header)",
+	"1 (10/100)", "True (XR819)", "False",
+	"26-pin, 13-pin, debug UART",
+	"13-pin header", pinoutAux_ZERO, 13
+} ;
+
+typedef struct
+{
+	int                  model ;
+	int                 *physToWpi ;
+	char               **physNames ;
+	char               **alts ;
+	int                  pinCount ;
+	void               (*socName) (int gpio, char *buf, size_t size) ;
+	const char          *dtModel ;
+	const pinout_board  *board ;
+} pinoutModel ;
+
+static const pinoutModel pinoutModels [] =
+{
+	{ PI_MODEL_ZERO, physToWpi_ZERO, physNames_ZERO, alts_common, 26,
+	  pinoutSunxiPinName, "Xunlong Orange Pi Zero", &pinoutBoard_ZERO },
+} ;
+
+static int pinoutDtModelIs (const char *wanted)
+{
+	char  buf [128] ;
+	FILE *fd ;
+	size_t n ;
+
+	if ((wanted == NULL) || ((fd = fopen ("/proc/device-tree/model", "r")) == NULL))
+		return FALSE ;
+
+	n = fread (buf, 1, sizeof (buf) - 1, fd) ;
+	fclose (fd) ;
+	buf [n] = 0 ;
+
+	return strcmp (buf, wanted) == 0 ;
+}
+
+static long pinoutRamMB (void)
+{
+	char  line [128] ;
+	long  kb = 0 ;
+	FILE *fd ;
+
+	if ((fd = fopen ("/proc/meminfo", "r")) == NULL)
+		return 0 ;
+
+	while (fgets (line, sizeof (line), fd) != NULL)
+		if (sscanf (line, "MemTotal: %ld kB", &kb) == 1)
+			break ;
+
+	fclose (fd) ;
+	return kb / 1024 ;
+}
+
+void doPinout (int argc, char *argv [])
+{
+	const pinoutModel *m = NULL ;
+	pinout_pin pins [64] ;
+	int model = -1, flags = 0 ;
+	int i, phys, pin, tmp ;
+
+	for (i = 2 ; i < argc ; ++i)
+	{
+		/**/ if (strcasecmp (argv [i], "--wpi")        == 0) flags |= PINOUT_SHOW_WPI ;
+		else if (strcasecmp (argv [i], "--gpio")       == 0) flags |= PINOUT_SHOW_GPIO ;
+		else if (strcasecmp (argv [i], "--monochrome") == 0) flags |= PINOUT_MONOCHROME ;
+		else if (strcasecmp (argv [i], "--color")      == 0) flags |= PINOUT_FORCE_COLOR ;
+		else
+		{
+			fprintf (stderr, "Usage: %s pinout [--wpi] [--gpio] [--monochrome] [--color]\n", argv [0]) ;
+			exit (EXIT_FAILURE) ;
+		}
+	}
+
+	if (wiringPiNodes != NULL)
+	{
+		fprintf (stderr, "%s: pinout does not work with extension modules, use readall.\n", argv [0]) ;
+		exit (EXIT_FAILURE) ;
+	}
+
+	piBoardId (&model) ;
+
+	for (i = 0 ; i < (int)(sizeof (pinoutModels) / sizeof (pinoutModels [0])) ; ++i)
+		if (pinoutModels [i].model == model)
+			m = &pinoutModels [i] ;
+
+	if (m == NULL)
+	{
+		fprintf (stderr, "%s: pinout is not available for this board yet, use \"%s readall\".\n", argv [0], argv [0]) ;
+		exit (EXIT_FAILURE) ;
+	}
+
+	tmp = wiringPiDebug ;
+	wiringPiDebug = FALSE ;
+
+	memset (pins, 0, sizeof (pins)) ;
+
+	for (phys = 1 ; phys <= m->pinCount ; ++phys)
+	{
+		pinout_pin *p = &pins [phys - 1] ;
+
+		p->name = (m->physNames [phys] != NULL) ? m->physNames [phys] : "" ;
+		p->wpi  = m->physToWpi [phys] ;
+		p->gpio = -1 ;
+		p->mode = NULL ;
+
+		if (p->wpi == -1)
+			continue ;
+
+		p->gpio = physPinToGpio (phys) ;
+
+		if (wpMode == WPI_MODE_GPIO)
+			pin = p->gpio ;
+		else if (wpMode == WPI_MODE_PHYS)
+			pin = phys ;
+		else
+			pin = p->wpi ;
+
+		p->mode  = m->alts [getAlt (pin)] ;
+		p->value = digitalRead (pin) ;
+		m->socName (p->gpio, p->soc, sizeof (p->soc)) ;
+	}
+
+	wiringPiDebug = tmp ;
+
+	pinoutRender (stdout, pinoutDtModelIs (m->dtModel) ? m->board : NULL,
+		pins, m->pinCount, pinoutRamMB (), 0, flags) ;
 }
 
 
