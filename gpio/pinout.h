@@ -17,6 +17,7 @@
 #define	PINOUT_SHOW_GPIO	(1 << 1)	// add the Linux GPIO number column
 #define	PINOUT_MONOCHROME	(1 << 2)	// never emit colour
 #define	PINOUT_FORCE_COLOR	(1 << 3)	// emit colour even when not on a TTY
+#define	PINOUT_DEMO		(1 << 4)	// table data only: no SoC column, state not read
 
 // Pin kinds, used for the colour coding and the legend
 

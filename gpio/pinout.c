@@ -148,7 +148,7 @@ static void fillRow (rowText *r, const pinout_pin *p, int phys, unsigned *kinds)
 
 	memset (r, 0, sizeof (*r)) ;
 
-	trimCopy (p->name, r->name, sizeof (r->name)) ;
+	trimCopy ((p->name != NULL) ? p->name : "", r->name, sizeof (r->name)) ;
 	snprintf (r->pin, sizeof (r->pin), "%d", phys) ;
 	snprintf (r->soc, sizeof (r->soc), "%s", p->soc) ;
 
@@ -192,12 +192,12 @@ static void headRow (rowText *r)
 
 static int leftWidth (int flags)
 {
-	return 8 + ((flags & PINOUT_SHOW_GPIO) ? 6 : 0) + ((flags & PINOUT_SHOW_WPI) ? 5 : 0) + 6 + 1 + 8 + 1 + 4 ;
+	return 8 + ((flags & PINOUT_SHOW_GPIO) ? 6 : 0) + ((flags & PINOUT_SHOW_WPI) ? 5 : 0) + ((flags & PINOUT_DEMO) ? 0 : 6) + 1 + 8 + 1 + 4 ;
 }
 
 static int rightWidth (int flags)
 {
-	return 3 + 2 + 8 + 1 + 5 + ((flags & PINOUT_SHOW_WPI) ? 5 : 0) + ((flags & PINOUT_SHOW_GPIO) ? 6 : 0) + 1 + 6 ;
+	return 3 + 2 + 8 + ((flags & PINOUT_DEMO) ? 0 : 6) + ((flags & PINOUT_SHOW_WPI) ? 5 : 0) + ((flags & PINOUT_SHOW_GPIO) ? 6 : 0) + 1 + 6 ;
 }
 
 static void printLeft (FILE *out, const rowText *r, int flags)
@@ -207,7 +207,8 @@ static void printLeft (FILE *out, const rowText *r, int flags)
 		cell (out, r->gpio, 6, 1, r->cNum) ;
 	if (flags & PINOUT_SHOW_WPI)
 		cell (out, r->wpi, 5, 1, r->cNum) ;
-	cell (out, r->soc, 6, 1, r->cNum) ;
+	if (!(flags & PINOUT_DEMO))
+		cell (out, r->soc, 6, 1, r->cNum) ;
 	fputc (' ', out) ;
 	cell (out, r->name, 8, 1, r->cName) ;
 	fputc (' ', out) ;
@@ -222,15 +223,18 @@ static void printRight (FILE *out, const rowText *r, int flags, int padEnd)
 	// Power and ground pins end after the name: no trailing blanks
 	// unless another table follows on the same line
 
-	if (!padEnd && (r->soc [0] == 0) && (r->mode [0] == 0))
+	if (!padEnd && (r->wpi [0] == 0) && (r->mode [0] == 0))
 	{
 		cell (out, r->name, (int)strlen (r->name), 0, r->cName) ;
 		return ;
 	}
 
 	cell (out, r->name, 8, 0, r->cName) ;
-	fputc (' ', out) ;
-	cell (out, r->soc, 5, 0, r->cNum) ;
+	if (!(flags & PINOUT_DEMO))
+	{
+		fputc (' ', out) ;
+		cell (out, r->soc, 5, 0, r->cNum) ;
+	}
 	if (flags & PINOUT_SHOW_WPI)
 	{
 		cell (out, r->wpi, 4, 1, r->cNum) ;
@@ -326,7 +330,7 @@ void pinoutRender (FILE *out, const pinout_board *board,
 	char     title [32], ram [16] ;
 	rowText  l, r ;
 	unsigned kinds = 0 ;
-	int      rows  = pinCount / 2 ;
+	int      rows  = (pinCount + 1) / 2 ;	// an odd count leaves the last right hand cell empty
 	int      wl    = leftWidth (flags) ;
 	int      wr    = rightWidth (flags) ;
 	int      total = wl + 3 + wr ;
@@ -409,10 +413,15 @@ void pinoutRender (FILE *out, const pinout_board *board,
 		if (i < rows)
 		{
 			fillRow (&l, &pins [i * 2],     i * 2 + 1, &kinds) ;
-			fillRow (&r, &pins [i * 2 + 1], i * 2 + 2, &kinds) ;
 			printLeft (out, &l, flags) ;
 			cell (out, " | ", 3, 0, C_DIM) ;
-			printRight (out, &r, flags, beside) ;
+			if (i * 2 + 2 <= pinCount)
+			{
+				fillRow (&r, &pins [i * 2 + 1], i * 2 + 2, &kinds) ;
+				printRight (out, &r, flags, beside) ;
+			}
+			else if (beside)
+				fprintf (out, "%*s", wr, "") ;
 		}
 		else
 			fprintf (out, "%*s", total, "") ;
@@ -459,7 +468,10 @@ void pinoutRender (FILE *out, const pinout_board *board,
 	{
 		char note [128] ;
 
-		snprintf (note, sizeof (note), "%soff: unclaimed%s%s%s",
+		if (flags & PINOUT_DEMO)
+			snprintf (note, sizeof (note), "demo: the pin state was not read") ;
+		else
+			snprintf (note, sizeof (note), "%soff: unclaimed%s%s%s",
 			useColor ? "bold: pin in use, " : "",
 			hasAux ? ", " : "", hasAux ? board->auxTitle : "", hasAux ? " has no live state" : "") ;
 		cell (out, note, (int)strlen (note), 0, C_DIM) ;

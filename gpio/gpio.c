@@ -97,6 +97,7 @@ char *usage = "Usage: gpio -v\n"
               "       gpio <toggle/blink> <pin>\n"
 	      "       gpio readall\n"
 	      "       gpio pinout [--wpi] [--gpio] [--monochrome] [--color]\n"
+	      "       gpio pinout --demo [board]\n"
 	      "       gpio unexportall/exports\n"
 	      "       gpio export/edge/unexport ...\n"
 	//      "       gpio wfi <pin> <mode>\n"
@@ -1470,6 +1471,16 @@ int main (int argc, char *argv [])
     printf ("\n") ;
     exit (EXIT_SUCCESS) ;
   }
+
+// pinout --demo only prints from tables: no root, no hardware needed
+
+  if (strcasecmp (argv [1], "pinout") == 0)
+    for (i = 2 ; i < argc ; ++i)
+      if (strcasecmp (argv [i], "--demo") == 0)
+      {
+	doPinout (argc, argv) ;
+	return 0 ;
+      }
 
   if (geteuid () != 0)
   {
