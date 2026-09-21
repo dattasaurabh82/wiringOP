@@ -327,7 +327,7 @@ void pinoutRender (FILE *out, const pinout_board *board,
 {
 	const char *term = getenv ("TERM") ;
 	const char *noColor = getenv ("NO_COLOR") ;
-	char     title [32], ram [16] ;
+	char     title [32], ram [32] ;
 	rowText  l, r ;
 	unsigned kinds = 0 ;
 	int      rows  = (pinCount + 1) / 2 ;	// an odd count leaves the last right hand cell empty
